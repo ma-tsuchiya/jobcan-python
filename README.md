@@ -9,7 +9,9 @@ seleniumを用いてjobcanを操作するライブラリです.
 このライブラリを利用したことによる損害について、作成者は一切の責任を負いません。
 
 # requirements
+- python3
 - selenium
+- chromedriver
 
 # todo
 
