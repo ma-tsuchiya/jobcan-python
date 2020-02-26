@@ -6,11 +6,25 @@ import time
 
 
 class Jobcan:
-    def __init__(self, user_email, user_password, chromedriver_path):
+    def __init__(self, user_email=None, user_password=None, chromedriver_path=None):
+        if (user_email and user_password) is None:
+            with open('./setting') as f:
+                user_email = user_email or f.readline().strip()
+                user_password = user_password or f.readline().strip()
+                chromedriver_path = chromedriver_path or f.readline().strip() or 'chromedriver'
         self.user_email = user_email
         self.user_password = user_password
         self.chromedriver_path = chromedriver_path
         self.driver = webdriver.Chrome(self.chromedriver_path)
+        self.login()
+
+    @staticmethod
+    def setting_file(filepath):
+        with open(filepath) as f:
+            user_email = f.readline().strip()
+            user_password = f.readline().strip()
+            chromedriver_path = f.readline().strip() or 'chromedriver'
+        return Jobcan(user_email, user_password, chromedriver_path)
 
     def login(self):
         self.driver.get('https://id.jobcan.jp/users/sign_in')
@@ -104,7 +118,6 @@ class Jobcan:
                     return '{:0>2}:{:0>2}'.format(h, m)
             time.sleep(1)
         raise AssertionError
-
 
     def get_status_table(self):
         self.move('https://ssl.jobcan.jp/employee/adit/modify/')
