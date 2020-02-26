@@ -54,6 +54,15 @@ class Jobcan:
             return
 
     def start_job(self, adit_group_text=None):
+        """
+        勤務開始の打刻をします。
+        未出勤/退室中 のとき, 入室
+        勤務中のとき, 
+         打刻場所と勤務場所が異なる場合, 移動
+         打刻場所と勤務場所が同一の場合, 何もしない
+         打刻場所を指定しない場合, 何もしない
+        return: (時刻:'hh:mm', jobcanに打刻したか？:True/False)
+        """
         status = False
         if not adit_group_text is None:
             adit_group_text = str(adit_group_text)
@@ -89,6 +98,12 @@ class Jobcan:
         return t, True
 
     def end_job(self):
+        """
+        勤務終了の打刻をします。
+        未出勤/退室中 のとき, 何もしない
+        勤務中のとき, 勤務場所で打刻をし, 退室
+        return: (時刻:'hh:mm', jobcanに打刻したか？:True/False)
+        """
         status = self.get_status_table()
         self.move('https://ssl.jobcan.jp/employee')
 
@@ -97,7 +112,7 @@ class Jobcan:
             Select(self.driver.find_element_by_css_selector('#adit_group_id')).select_by_visible_text(adit_group_text)
             if self.driver.find_element_by_id('working_status').text != '勤務中':
                 print('勤務中ではありません')
-                return self.get_time(), True
+                return self.get_time(), False
             #t = self.get_time()
             self.driver.find_element_by_id('adit-button-push').click()
             time.sleep(5)
