@@ -2,6 +2,7 @@
 from selenium import webdriver
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.keys import Keys
 import time
 
 
@@ -174,10 +175,10 @@ class Jobcan:
         time.sleep(5)
 
     def _mh_daily_close_window(self):
-        self.driver.find_element_by_id('menu-close').click()
+        self.driver.find_element_by_id('menu-close').send_keys(Keys.ENTER)
 
     def _mh_daily_save_close_window(self):
-        self.driver.find_element_by_id('save').click()
+        self.driver.find_element_by_id('save').send_keys(Keys.ENTER)
 
 
     def _mh_daily_get_report(self):    # daily-windowを開いた状態で呼ぶメソッド
