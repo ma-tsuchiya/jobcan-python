@@ -4,6 +4,26 @@ from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.keys import Keys
 import time
+import datetime
+
+# utility
+
+
+def checkbox_setvalue(checkbox, value, toggle='click'):
+    value = bool(value)
+    if checkbox.is_selected() == value:
+        return False
+    if toggle.lower() == 'click':
+        checkbox.click()
+    elif toggle.lower() == 'enter':
+        checkbox.send_keys(Keys.ENTER)
+    elif toggle.lower() == 'space':
+        checkbox.send_keys(Keys.SPACE)
+
+
+
+
+# Main classes
 
 
 class Jobcan:
@@ -54,7 +74,7 @@ class Jobcan:
                 time.sleep(1)
             return
 
-    def start_job(self, adit_group_text=None):
+    def start_job(self, adit_group_text=None, yakin=False):
         """
         勤務開始の打刻をします。
         未出勤/退室中 のとき, 入室
@@ -67,9 +87,14 @@ class Jobcan:
         status = False
         if not adit_group_text is None:
             adit_group_text = str(adit_group_text)
-            status = self.get_status_table()
+            if yakin:
+                status = self.get_status_table('yesterday')
+            else:
+                status = self.get_status_table()
 
         self.move('https://ssl.jobcan.jp/employee')
+        checkbox_setvalue(self.driver.find_element_by_id('is_yakin'), yakin)
+
         # 場所の選択
         if adit_group_text is not None:
             if self.driver.find_element_by_id('working_status').text == '勤務中':  # 勤務中: 勤務場所変更か何もしない
@@ -98,16 +123,21 @@ class Jobcan:
 
         return t, True
 
-    def end_job(self):
+    def end_job(self, yakin=False):
         """
         勤務終了の打刻をします。
         未出勤/退室中 のとき, 何もしない
         勤務中のとき, 勤務場所で打刻をし, 退室
         return: (時刻:'hh:mm', jobcanに打刻したか？:True/False)
         """
-        status = self.get_status_table()
+
+        if yakin:
+            status = self.get_status_table('yesterday')
+        else:
+            status = self.get_status_table()
         self.move('https://ssl.jobcan.jp/employee')
 
+        checkbox_setvalue(self.driver.find_element_by_id('is_yakin'), yakin)
         if status:
             adit_group_text = status[-1]['打刻場所']
             Select(self.driver.find_element_by_css_selector('#adit_group_id')).select_by_visible_text(adit_group_text)
@@ -135,8 +165,23 @@ class Jobcan:
             time.sleep(1)
         raise AssertionError
 
-    def get_status_table(self):
+    def get_status_table(self, day='today', fmt='%Y/%m/%d'):
+        day = day.lower()
         self.move('https://ssl.jobcan.jp/employee/adit/modify/')
+        if day=='today':
+            pass
+        else:
+            if day=='yesterday':
+                iyear = int(Select(self.driver.find_element_by_name('year')).first_selected_option.text)
+                imonth = int(Select(self.driver.find_element_by_name('month')).first_selected_option.text)
+                iday = int(Select(self.driver.find_element_by_name('day')).first_selected_option.text)
+                date = datetime.date(iyear, imonth, iday) - datetime.timedelta(days=1)
+            else:
+                date = datetime.datetime.strptime(day, fmt).date()
+
+            # set date
+            self.move('https://ssl.jobcan.jp/employee/adit/modify?year={}&month={}&day={}'.format(date.year, date.month, date.day))
+
         try:
             rows = len(self.driver.find_element_by_xpath('//*[@id="logs-table"]/div/table').find_elements_by_tag_name('tr'))
         except NoSuchElementException:
@@ -152,6 +197,10 @@ class Jobcan:
             d['打刻備考等'] = self.driver.find_element_by_id('edit-reason-{}_text'.format(i)).text
             ret.append(d)
         return ret
+
+    def get_adit_group(self):
+        self.move('https://ssl.jobcan.jp/employee')
+        return [s.text for s in Select(self.driver.find_element_by_css_selector('#adit_group_id')).options]
 
     def __del__(self):
         self.close()
@@ -175,7 +224,7 @@ class Jobcan:
         time.sleep(5)
 
     def _mh_daily_close_window(self):
-        self.driver.find_element_by_id('menu-close').send_keys(Keys.ENTER)
+        self.driver.execute_script('closeMenu();')
 
     def _mh_daily_save_close_window(self):
         self.driver.find_element_by_id('save').send_keys(Keys.ENTER)
@@ -249,5 +298,27 @@ class Jobcan:
         self.move('https://ssl.jobcan.jp/employee/man-hour-manage')
         self._mh_open_daily_window(year, month, day)
         ret = self._mh_daily_get_report()
+        self._mh_daily_close_window()
+        return ret
+
+    def get_projects_and_tasks(self):
+        date = datetime.date.today()
+        self.move('https://ssl.jobcan.jp/employee/man-hour-manage')
+        self._mh_open_daily_window(date.year, date.month, date.day)
+        rows = len(self.driver.find_element_by_xpath(
+            '//*[@id="edit-menu-contents"]/table').find_elements_by_tag_name('tr'))
+        if rows == 2:
+            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[2]/td[5]/div'
+        else:
+            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/td[5]/div[1]'.format(rows)
+        self.driver.find_element_by_xpath(xpath).click()
+        row_xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/'.format(rows + 1)
+        projects = [s.text for s in Select(self.driver.find_element_by_xpath(row_xpath + 'td[2]/select')).options]
+        ret = {}
+        for project in projects:
+            Select(self.driver.find_element_by_xpath(row_xpath + 'td[2]/select')).select_by_visible_text(project)
+            tasks = tuple(s.text for s in Select(self.driver.find_element_by_xpath(row_xpath + 'td[3]/select')).options)
+            ret[project] = tasks
+
         self._mh_daily_close_window()
         return ret

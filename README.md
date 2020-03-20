@@ -26,19 +26,20 @@ jobcan = Jobcan()           # settingファイルを作成してある場合, �
 ```
 出勤
 ```
-jobcan.start_job('本社')    #　勤務開始の打刻をします. 夜勤モード非対応です.
+jobcan.start_job('本社', yakin=False)    #　勤務開始の打刻をします.
 ```
 退勤
 ```python
-jobcan.end_job()            #　勤務終了の打刻をします. 夜勤モード非対応です. 日をまたがずに帰ってください.
+jobcan.end_job(yakin=False)            #　勤務終了の打刻をします. 
 ```
 
 工数入力
 ```python
-jobcan.add_man_hour(self, project_name='不毛な会議', task_name='出席', year=2020, month=1, day=3, worktime_hour=2, worktime_minute=15)         # 工数入力をします.
+jobcan.add_man_hour(project_name='不毛な会議', task_name='出席', year=2020, month=1, day=3, worktime_hour=2, worktime_minute=15)         # 工数入力をします.
 ```
 # todo
 
 - 工数入力の労働時間・工数の一致確認処理実装
 - サンプルコードの作成
 - 参考サイト
+python
