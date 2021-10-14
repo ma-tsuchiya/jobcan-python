@@ -36,7 +36,10 @@ class Jobcan:
         self.user_email = user_email
         self.user_password = user_password
         self.chromedriver_path = chromedriver_path
-        self.driver = webdriver.Chrome(self.chromedriver_path)
+        if self.chromedriver_path is not None:
+            self.driver = webdriver.Chrome(self.chromedriver_path)
+        else:
+            self.driver = webdriver.Chrome()
         self.login()
 
     @staticmethod
@@ -183,7 +186,7 @@ class Jobcan:
             self.move('https://ssl.jobcan.jp/employee/adit/modify?year={}&month={}&day={}'.format(date.year, date.month, date.day))
 
         try:
-            rows = len(self.driver.find_element_by_xpath('//*[@id="logs-table"]/div/table').find_elements_by_tag_name('tr'))
+            rows = len(self.driver.find_element_by_xpath('//*[@id="logs-table"]/div/table/tbody').find_elements_by_tag_name('tr'))
         except NoSuchElementException:
             return []
         ret = []
@@ -220,20 +223,20 @@ class Jobcan:
     def _mh_open_daily_window(self, year, month, day):
         self._mh_set_year_month(year, month)
         self.driver.find_element_by_xpath(
-            '//*[@id="search-result"]/table/tbody/tr[{}]/td[4]/div'.format(int(day)+1)).click()
+            '//*[@id="search-result"]/table/tbody/tr[{}]/td[4]/div'.format(int(day))).click()
         time.sleep(5)
 
     def _mh_daily_close_window(self):
-        self.driver.execute_script('closeMenu();')
+        self.driver.find_element_by_id('menu-close').send_keys(Keys.ENTER)
 
     def _mh_daily_save_close_window(self):
         self.driver.find_element_by_id('save').send_keys(Keys.ENTER)
 
 
     def _mh_daily_get_report(self):    # daily-windowを開いた状態で呼ぶメソッド
-        rows = len(self.driver.find_element_by_xpath('//*[@id="edit-menu-contents"]/table').find_elements_by_tag_name('tr'))
+        rows = len(self.driver.find_element_by_xpath('//*[@id="edit-menu-contents"]/table/tbody').find_elements_by_tag_name('tr'))
         ret = []
-        for i in range(3, rows+1):
+        for i in range(2, rows+1):
             row_xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/'.format(i)
             d = {}
             d['プロジェクト'] = Select(self.driver.find_element_by_xpath(row_xpath + 'td[2]/select')).first_selected_option.text
@@ -244,11 +247,11 @@ class Jobcan:
 
     def _mh_daily_append_record_tail(self, project_name, task_name, worktime_hour, worktime_minute):
         rows = len(self.driver.find_element_by_xpath(
-            '//*[@id="edit-menu-contents"]/table').find_elements_by_tag_name('tr'))
-        if rows == 2:
-            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[2]/td[5]/div'
+            '//*[@id="edit-menu-contents"]/table/tbody').find_elements_by_tag_name('tr'))
+        if rows == 1:
+            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[1]/td[5]/span'
         else:
-            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/td[5]/div[1]'.format(rows)
+            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/td[5]/span[1]'.format(rows)
         self.driver.find_element_by_xpath(xpath).click()
         row_xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/'.format(rows + 1)
         Select(self.driver.find_element_by_xpath(row_xpath + 'td[2]/select')).select_by_visible_text(project_name)
@@ -260,30 +263,32 @@ class Jobcan:
 
     def _mh_daily_add_record(self, project_name, task_name, worktime_hour, worktime_minute):    # 時間追加用メソッド
         rows = len(self.driver.find_element_by_xpath(
-            '//*[@id="edit-menu-contents"]/table').find_elements_by_tag_name('tr'))
-        for i in range(3, rows+1):
+            '//*[@id="edit-menu-contents"]/table/tbody').find_elements_by_tag_name('tr'))
+        for i in range(2, rows+1):
             row_xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/'.format(i)
             if Select(self.driver.find_element_by_xpath(row_xpath + 'td[2]/select')).first_selected_option.text== project_name:
-                input_ = self.driver.find_element_by_xpath(row_xpath + 'td[4]/input[1]')
-                hour, min = input_.get_attribute('value').split(':')
-                minutes = int(min) + 60 * int(hour) + worktime_minute + int(60 * worktime_hour)
-                input_.clear()
-                input_.send_keys('{}:{}'.format(minutes//60, minutes%60))
-                return
+                if Select(self.driver.find_element_by_xpath(row_xpath + 'td[3]/select')).first_selected_option.text== task_name:
+                    input_ = self.driver.find_element_by_xpath(row_xpath + 'td[4]/input[1]')
+                    hour, min = input_.get_attribute('value').split(':')
+                    minutes = int(min) + 60 * int(hour) + worktime_minute + int(60 * worktime_hour)
+                    input_.clear()
+                    input_.send_keys('{}:{}'.format(minutes//60, minutes%60))
+                    return
 
         self._mh_daily_append_record_tail(project_name, task_name, worktime_hour, worktime_minute)
 
     def _mh_daily_write_record(self, project_name, task_name, worktime_hour, worktime_minute):  # 上書き用メソッド
         rows = len(self.driver.find_element_by_xpath(
-            '//*[@id="edit-menu-contents"]/table').find_elements_by_tag_name('tr'))
-        for i in range(3, rows+1):
+            '//*[@id="edit-menu-contents"]/table/tbody').find_elements_by_tag_name('tr'))
+        for i in range(2, rows+1):
             row_xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/'.format(i)
             if Select(self.driver.find_element_by_xpath(row_xpath + 'td[2]/select')).first_selected_option.text== project_name:
-                input_ = self.driver.find_element_by_xpath(row_xpath + 'td[4]/input[1]')
-                minutes = worktime_minute + int(60 * worktime_hour)
-                input_.clear()
-                input_.send_keys('{}:{}'.format(minutes//60, minutes%60))
-                return
+                if Select(self.driver.find_element_by_xpath(row_xpath + 'td[3]/select')).first_selected_option.text== task_name:
+                    input_ = self.driver.find_element_by_xpath(row_xpath + 'td[4]/input[1]')
+                    minutes = worktime_minute + int(60 * worktime_hour)
+                    input_.clear()
+                    input_.send_keys('{}:{}'.format(minutes//60, minutes%60))
+                    return
 
         self._mh_daily_append_record_tail(project_name, task_name, worktime_hour, worktime_minute)
 
@@ -306,11 +311,11 @@ class Jobcan:
         self.move('https://ssl.jobcan.jp/employee/man-hour-manage')
         self._mh_open_daily_window(date.year, date.month, date.day)
         rows = len(self.driver.find_element_by_xpath(
-            '//*[@id="edit-menu-contents"]/table').find_elements_by_tag_name('tr'))
-        if rows == 2:
-            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[2]/td[5]/div'
+            '//*[@id="edit-menu-contents"]/table/tbody').find_elements_by_tag_name('tr'))
+        if rows == 1:
+            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[1]/td[5]/span'
         else:
-            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/td[5]/div[1]'.format(rows)
+            xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/td[5]/span[1]'.format(rows)
         self.driver.find_element_by_xpath(xpath).click()
         row_xpath = '//*[@id="edit-menu-contents"]/table/tbody/tr[{}]/'.format(rows + 1)
         projects = [s.text for s in Select(self.driver.find_element_by_xpath(row_xpath + 'td[2]/select')).options]
